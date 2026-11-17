@@ -130,8 +130,7 @@
 
             try {
                 // LLAMADA AL NUEVO ENDPOINT NODE.JS
-                const respuesta = await fetch(`http://localhost:3000/api/gotruck?referencia=${encodeURIComponent(input)}`);
-                const datos = await respuesta.json();
+                const respuesta = await fetch(`https://saetracker.onrender.com/api/gotruck?referencia=${encodeURIComponent(input)}`);                const datos = await respuesta.json();
 
                 if (respuesta.ok && datos.existe) {
                     document.getElementById('searchSection').classList.add('hidden');
@@ -261,7 +260,7 @@
 
             try {
                 // LLAMADA AL NUEVO ENDPOINT NODE.JS
-                const res = await fetch(`http://localhost:3000/api/thk?name=${encodeURIComponent(equipoSeleccionado)}`);
+                const res = await fetch(`https://saetracker.onrender.com/api/thk?name=${encodeURIComponent(equipoSeleccionado)}`);
                 const data = await res.json();
 
                 if (res.ok && data.lat && data.lng) {

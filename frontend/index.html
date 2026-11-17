@@ -70,6 +70,7 @@
     <!-- Header Estilo SAEDocs -->
     <header class="bg-white px-6 py-4 shadow-sm flex items-center justify-between border-b border-slate-200">
         <div class="flex items-center gap-3 text-xl font-bold text-sae-dark">
+            <img src="./src/SAETracker_GPS_Logo.png" alt="SAETracker" class="h-10">
         </div>
         <div class="text-sm text-slate-500 font-medium">Portal de Seguimiento de Flota</div>
     </header>
@@ -92,9 +93,8 @@
             </div>
         </section>
 
-        <!-- RESULTADOS: TABLA (Minimalista sin bordes verticales) -->
+        <!-- RESULTADOS: TABLA -->
         <section id="resultsSection" class="hidden animate-fade-in">
-            <!-- Tarjeta Contenedora de la Tabla -->
             <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
                 
                 <div class="flex justify-between items-start border-b border-slate-100 pb-4 mb-4">
@@ -107,8 +107,9 @@
                     </button>
                 </div>
 
+                <!-- Le agregamos id="tablaResultados" a la tabla -->
                 <div class="overflow-x-auto">
-                    <table class="w-full text-sm text-left whitespace-nowrap">
+                    <table id="tablaResultados" class="w-full text-sm text-left whitespace-nowrap">
                         <thead class="text-xs text-slate-500 uppercase tracking-wider border-b border-slate-200">
                             <tr>
                                 <th class="px-4 py-3 font-medium">#</th>
@@ -128,6 +129,19 @@
                         </tbody>
                     </table>
                 </div>
+
+                <!-- NUEVO: Botón de Copiar Datos -->
+                <div class="mt-4 flex justify-end">
+                    <button id="btnCopiar" onclick="copiarTablaParaCorreo()" 
+                            class="flex items-center gap-2 px-5 py-2.5 bg-slate-100 text-slate-700 font-medium rounded-lg hover:bg-slate-200 transition-colors border border-slate-300 text-sm shadow-sm">
+                        <!-- Icono de portapapeles -->
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path>
+                        </svg>
+                        <span>Copiar al portapapeles</span>
+                    </button>
+                </div>
+
             </div>
         </section>
 
@@ -349,6 +363,48 @@
         function volverPatentes() {
             document.getElementById('trackingSection').classList.add('hidden');
             document.querySelectorAll('#tablaPatentes tr').forEach(f => f.classList.remove('table-row-active'));
+        }
+
+        function copiarTablaParaCorreo() {
+            const tabla = document.getElementById('tablaResultados');
+            const btnCopiar = document.getElementById('btnCopiar');
+            const originalHTML = btnCopiar.innerHTML;
+
+            // 1. Creamos un "Rango" y seleccionamos la tabla
+            const range = document.createRange();
+            range.selectNode(tabla);
+            
+            // 2. Aplicamos la selección al navegador
+            const windowSelection = window.getSelection();
+            windowSelection.removeAllRanges(); // Limpiamos selecciones previas
+            windowSelection.addRange(range);
+            
+            try {
+                // 3. Ejecutamos el comando de copiado nativo
+                document.execCommand('copy');
+                
+                // 4. Feedback visual de éxito
+                btnCopiar.classList.remove('bg-slate-100', 'text-slate-700', 'border-slate-300');
+                btnCopiar.classList.add('bg-green-500', 'text-white', 'border-green-600');
+                btnCopiar.innerHTML = `
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                    <span>¡Copiado al portapapeles!</span>
+                `;
+                
+                // 5. Devolver el botón a la normalidad después de 2 segundos
+                setTimeout(() => {
+                    btnCopiar.classList.remove('bg-green-500', 'text-white', 'border-green-600');
+                    btnCopiar.classList.add('bg-slate-100', 'text-slate-700', 'border-slate-300');
+                    btnCopiar.innerHTML = originalHTML;
+                }, 2000);
+
+            } catch (err) {
+                console.error('Error al copiar: ', err);
+                alert('Hubo un problema al copiar la tabla.');
+            }
+            
+            // 6. Quitamos el sombreado de la tabla para que no quede seleccionada visualmente
+            windowSelection.removeAllRanges();
         }
     </script>
 </body>

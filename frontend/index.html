@@ -116,6 +116,7 @@
                                 <th class="px-4 py-3 font-medium">O.S.</th>
                                 <th class="px-4 py-3 font-medium">Fecha retiro</th>
                                 <th class="px-4 py-3 font-medium">Origen</th>
+                                <th class="px-4 py-3 font-medium">Planta</th>
                                 <th class="px-4 py-3 font-medium">Destino</th>
                                 <th class="px-4 py-3 font-medium">Conductor</th>
                                 <th class="px-4 py-3 font-medium">Patente</th>
@@ -227,33 +228,88 @@
                     movimientosGlobales = Object.values(movimientosPorContenedor);
                     trazabilidadGlobal = datos.trazabilidad || [];
 
-                    movimientosGlobales.forEach((mov, index) => {
-                        let fechaRetiro = '-';
-                        const rawDate = infoContenedor.pickup_at || mov.start_at || cabecera.containers?.[0]?.pickup_at;
-                        if (rawDate) fechaRetiro = new Date(rawDate).toLocaleDateString('es-CL');
+                    // Agrupar movimientos por contenedor y por etapa (status_id) para conservar
+                // Tramo 1 (Planta) y Tramo 2 (Puerto) sin perder el filtro anti-enroques
+                const contenedoresMap = {};
+                (datos.movimientos || []).forEach(mov => {
+                    const claveCont = (mov.container && mov.container !== 'N/D')
+                        ? mov.container.trim()
+                        : `SIN_CONT_${mov.movement_id}`;
 
-                        const traceTabla = trazabilidadGlobal.find(t => t.container === mov.container) || trazabilidadGlobal[0] || {};
-                        const estadoLabel = traceTabla.status_label || mov.state_label || 'Pendiente';
-                        
-                        const tr = document.createElement('tr');
-                        // Hover styling limpio
-                        tr.className = "hover:bg-slate-50 cursor-pointer transition-colors";
-                        tr.onclick = function() { mostrarTracking(index, mov.truck || 'N/D', mov.ramp || 'N/D', this); };
+                    if (!contenedoresMap[claveCont]) {
+                        contenedoresMap[claveCont] = {};
+                    }
 
-                        tr.innerHTML = `
-                            <td class="px-4 py-4 text-slate-400 font-medium">${index + 1}</td>
-                            <td class="px-4 py-4 font-medium text-slate-800">${mov.service_id || cabecera.service_id || '-'}</td>
-                            <td class="px-4 py-4">${fechaRetiro}</td>
-                            <td class="px-4 py-4">${infoContenedor.pickup?.place || mov.origin?.name || '-'}</td>
-                            <td class="px-4 py-4">${infoContenedor.return?.place || mov.destination?.name || '-'}</td>
-                            <td class="px-4 py-4">${mov.driver?.name || 'SIN ASIGNAR'}</td>
-                            <td class="px-4 py-4 font-medium">${mov.truck || '-'}</td>
-                            <td class="px-4 py-4 text-slate-500">${mov.ramp || '-'}</td>
-                            <td class="px-4 py-4 text-slate-500">${mov.container || infoContenedor.container || '-'}</td>
-                            <td class="px-4 py-4 text-right text-sae-blue font-medium">${estadoLabel}</td>
-                        `;
-                        tbody.appendChild(tr);
-                    });
+                    const claveEtapa = mov.status_id || mov.status_label || mov.movement_id;
+                    // Si hubo enroque en la misma etapa, nos quedamos con el movement_id más reciente
+                    if (!contenedoresMap[claveCont][claveEtapa] || mov.movement_id > contenedoresMap[claveCont][claveEtapa].movement_id) {
+                        contenedoresMap[claveCont][claveEtapa] = mov;
+                    }
+                });
+
+                // Construir 1 registro por contenedor con sus tramos ordenados cronológicamente
+                const norm = (txt) => (txt || '').trim().toUpperCase();
+
+                movimientosGlobales = Object.values(contenedoresMap).map(etapasObj => {
+                    const tramos = Object.values(etapasObj).sort((a, b) => a.movement_id - b.movement_id);
+                    const tramoInicial = tramos[0];
+                    const tramoActual = tramos[tramos.length - 1];
+
+                    const esMismoCont = infoContenedor.container === tramoActual.container;
+                    const pickupPlace = esMismoCont ? infoContenedor.pickup?.place : null;
+                    const deliveryPlace = esMismoCont ? infoContenedor.delivery?.place : null;
+                    const returnPlace = esMismoCont ? infoContenedor.return?.place : null;
+
+                    const origen = pickupPlace || tramoInicial.origin?.name || '-';
+                    const destino = returnPlace || tramoActual.destination?.name || deliveryPlace || '-';
+
+                    // Solo existe parada intermedia si hay 2+ tramos, o si delivery existe y es distinto a origen y destino
+                    let planta = null;
+                    if (tramos.length >= 2) {
+                        const candidata = deliveryPlace || tramoInicial.destination?.name;
+                        if (candidata && norm(candidata) !== norm(origen) && norm(candidata) !== norm(destino)) {
+                            planta = candidata;
+                        }
+                    } else if (deliveryPlace && returnPlace && norm(deliveryPlace) !== norm(origen) && norm(deliveryPlace) !== norm(destino)) {
+                        planta = deliveryPlace;
+                    }
+
+                    return {
+                        ...tramoActual,
+                        _tramos: tramos,
+                        _ruta: { origen, planta, destino }
+                    };
+                });
+
+                trazabilidadGlobal = datos.trazabilidad || [];
+
+                movimientosGlobales.forEach((mov, index) => {
+                    let fechaRetiro = '-';
+                    const rawDate = infoContenedor.pickup?.scheduled_at || infoContenedor.pickup_at || mov._tramos[0]?.start_at || cabecera.containers?.[0]?.pickup_at;
+                    if (rawDate) fechaRetiro = new Date(rawDate).toLocaleDateString('es-CL');
+
+                    const traceTabla = trazabilidadGlobal.find(t => t.container === mov.container) || trazabilidadGlobal[0] || {};
+                    const estadoLabel = traceTabla.status_label || mov.state_label || 'Pendiente';
+
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-slate-50 cursor-pointer transition-colors";
+                    tr.onclick = function() { mostrarTracking(index, mov.truck || 'N/D', mov.ramp || 'N/D', this); };
+
+                    tr.innerHTML = `
+                        <td class="px-4 py-4 text-slate-400 font-medium">${index + 1}</td>
+                        <td class="px-4 py-4 font-medium text-slate-800">${mov.service_id || cabecera.service_id || '-'}</td>
+                        <td class="px-4 py-4">${fechaRetiro}</td>
+                        <td class="px-4 py-4">${mov._ruta.origen}</td>
+                        <td class="px-4 py-4">${mov._ruta.planta || '<span class="text-slate-400">N/A</span>'}</td>
+                        <td class="px-4 py-4">${mov._ruta.destino}</td>
+                        <td class="px-4 py-4">${mov.driver?.name || 'SIN ASIGNAR'}</td>
+                        <td class="px-4 py-4 font-medium">${mov.truck || '-'}</td>
+                        <td class="px-4 py-4 text-slate-500">${mov.ramp || '-'}</td>
+                        <td class="px-4 py-4 text-slate-500">${mov.container || infoContenedor.container || '-'}</td>
+                        <td class="px-4 py-4 text-right text-sae-blue font-medium">${estadoLabel}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
                 } else {
                     alert(datos.error ? `Error: ${datos.error}` : 'No se encontraron registros activos para esta reserva.');
                 }
@@ -285,38 +341,62 @@
         }
 
         function generarTimeline(mov) {
-            const trace = trazabilidadGlobal.find(t => t.container === mov.container) || trazabilidadGlobal[0] || {};
-            const milestones = trace.milestones || {};
-            
-            const formatFecha = (str) => str ? `<span class="text-slate-800 font-medium">${new Date(str).toLocaleDateString('es-CL')}</span> - ${new Date(str).toLocaleTimeString('es-CL', {hour:'2-digit', minute:'2-digit'})}` : 'Pendiente de registro';
+    const trace = trazabilidadGlobal.find(t => t.container === mov.container) || trazabilidadGlobal[0] || {};
+    const tramos = mov._tramos || [mov];
+    const tienePlanta = Boolean(mov._ruta?.planta) && tramos.length >= 2;
+    // Helper: lee tanto strings (trazabilidad) como objetos { at } (movimientos)
+    const getAt = (val) => (val && typeof val === 'object') ? val.at : (val || null);
 
-            const llegoO = Boolean(milestones.arrival_origin);
-            const salioO = Boolean(milestones.departure_origin);
-            const llegoD = Boolean(milestones.arrival_destination);
-            const salioD = Boolean(milestones.departure_destination);
-            const terminado = trace.status === 'finalizado' || salioD;
+    const formatFecha = (str) => str
+        ? `<span class="text-slate-800 font-medium">${new Date(str).toLocaleDateString('es-CL')}</span> - ${new Date(str).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}`
+        : 'Pendiente de registro';
 
-            const getClase = (completado, actual) => completado ? 'completed' : (actual ? 'current' : '');
+    let pasos = [];
 
-            document.getElementById('contenedorTimeline').innerHTML = `
-                <div class="timeline-step relative pl-10 mb-8 ${getClase(llegoO && salioO, llegoO && !salioO)}">
-                    <p class="text-sm font-bold text-slate-700 m-0">Llegada a Origen</p>
-                    <p class="text-xs text-slate-500 mt-1">${formatFecha(milestones.arrival_origin)}</p>
-                </div>
-                <div class="timeline-step relative pl-10 mb-8 ${getClase(salioO && llegoD, salioO && !llegoD)}">
-                    <p class="text-sm font-bold text-slate-700 m-0">Salida de Origen</p>
-                    <p class="text-xs text-slate-500 mt-1">${formatFecha(milestones.departure_origin)}</p>
-                </div>
-                <div class="timeline-step relative pl-10 mb-8 ${getClase(llegoD && terminado, llegoD && !terminado)}">
-                    <p class="text-sm font-bold text-slate-700 m-0">Llegada a Destino</p>
-                    <p class="text-xs text-slate-500 mt-1">${formatFecha(milestones.arrival_destination)}</p>
-                </div>
-                <div class="timeline-step relative pl-10 mb-2 ${getClase(terminado, false)}">
-                    <p class="text-sm font-bold text-slate-700 m-0">Salida de Destino</p>
-                    <p class="text-xs text-slate-500 mt-1">${formatFecha(milestones.departure_destination)}</p>
-                </div>
-            `;
-        }
+    if (tienePlanta) {
+        const t1 = tramos[0].milestones || {};
+        const t2 = tramos[tramos.length - 1].milestones || {};
+        const tm = trace.milestones || {};
+
+        pasos = [
+            { titulo: 'Llegada a Origen', lugar: mov._ruta?.origen, fecha: getAt(t1.arrival_origin) || getAt(tm.arrival_origin) },
+            { titulo: 'Salida de Origen', lugar: '', fecha: getAt(t1.departure_origin) || getAt(tm.departure_origin) },
+            { titulo: 'Llegada a Planta', lugar: mov._ruta?.planta, fecha: getAt(t2.arrival_origin) || getAt(t1.arrival_destination) },
+            { titulo: 'Salida de Planta', lugar: '', fecha: getAt(t2.departure_origin) || getAt(t1.departure_destination) },
+            { titulo: 'Llegada a Destino', lugar: mov._ruta?.destino, fecha: getAt(t2.arrival_destination) || getAt(tm.arrival_destination) },
+            { titulo: 'Salida de Destino', lugar: '', fecha: getAt(t2.departure_destination) || getAt(tm.departure_destination) }
+        ];
+    } else {
+        const tm = trace.milestones || {};
+        const m = mov.milestones || {};
+
+        pasos = [
+            { titulo: 'Llegada a Origen', lugar: mov._ruta?.origen, fecha: getAt(tm.arrival_origin) || getAt(m.arrival_origin) },
+            { titulo: 'Salida de Origen', lugar: '', fecha: getAt(tm.departure_origin) || getAt(m.departure_origin) },
+            { titulo: 'Llegada a Destino', lugar: mov._ruta?.destino, fecha: getAt(tm.arrival_destination) || getAt(m.arrival_destination) },
+            { titulo: 'Salida de Destino', lugar: '', fecha: getAt(tm.departure_destination) || getAt(m.departure_destination) }
+        ];
+    }
+
+    const terminado = trace.status === 'finalizado' || Boolean(pasos[pasos.length - 1].fecha);
+
+    document.getElementById('contenedorTimeline').innerHTML = pasos.map((paso, i) => {
+        const esUltimo = i === pasos.length - 1;
+        const completado = esUltimo
+            ? terminado
+            : Boolean(paso.fecha) && (Boolean(pasos[i + 1].fecha) || terminado);
+        const actual = !completado && Boolean(paso.fecha);
+        const clase = completado ? 'completed' : (actual ? 'current' : '');
+
+        return `
+            <div class="timeline-step relative pl-10 ${esUltimo ? 'mb-2' : 'mb-7'} ${clase}">
+                <p class="text-sm font-bold text-slate-700 m-0">${paso.titulo}</p>
+                ${paso.lugar && paso.lugar !== '-' ? `<p class="text-[11px] text-slate-400 mt-0.5 truncate" title="${paso.lugar}">${paso.lugar}</p>` : ''}
+                <p class="text-xs text-slate-500 mt-1">${formatFecha(paso.fecha)}</p>
+            </div>
+        `;
+    }).join('');
+}
 
         async function mostrarMapa() {
             const mapSec = document.getElementById('mapSection');

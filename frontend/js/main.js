@@ -211,7 +211,7 @@ async function buscarReserva(referenciaForzada = null, esRecarga = false) {
 
             const cabecera = datos.cabecera || {};
             const infoContenedor = datos.contenedor || {};
-            trazabilidadGlobal = datos.trazabilidad || [];
+            trazabilidadGlobal = Array.isArray(datos.trazabilidad) ? datos.trazabilidad : [];
 
             document.getElementById('displayBooking').innerText = cabecera.shipment || input.toUpperCase();
 
@@ -250,7 +250,12 @@ async function buscarReserva(referenciaForzada = null, esRecarga = false) {
                 const tramoInicial = tramos[0];
                 const tramoActual = tramos[tramos.length - 1];
 
-                const traceCont = trazabilidadGlobal.find(t => t.container === tramoActual.container) || trazabilidadGlobal[0] || {};
+                // Buscar el registro exacto en traceability (por container_id o container)
+                const traceCont = trazabilidadGlobal.find(t =>
+                    (t.container_id && tramoActual.container_id && String(t.container_id) === String(tramoActual.container_id)) ||
+                    (t.container && tramoActual.container && normalizarTexto(t.container) === normalizarTexto(tramoActual.container))
+                ) || (trazabilidadGlobal.length === 1 ? trazabilidadGlobal[0] : {});
+
                 const tm = traceCont.milestones || {};
                 const t1m = tramoInicial.milestones || {};
                 const t2m = tramoActual.milestones || {};
@@ -298,12 +303,24 @@ async function buscarReserva(referenciaForzada = null, esRecarga = false) {
                 const llegadaDestino = getAt(t2m.arrival_destination) || getAt(tm.arrival_destination);
                 const salidaDestino = getAt(t2m.departure_destination) || getAt(tm.departure_destination);
 
-                // Determinar si el viaje está finalizado
-                const estadoLabel = traceCont.status_label || tramoActual.state_label || 'Pendiente';
-                const viajeFinalizado =
+                // Validar si existen fechas reales registradas en el viaje
+                const tieneFechasViaje = Boolean(
+                    llegadaOrigen || salidaOrigen ||
+                    llegadaPlanta || salidaPlanta ||
+                    llegadaDestino || salidaDestino
+                );
+
+                // Estado obtenido ESTRICTAMENTE desde traceability (sin usar el estado de la ODS/movimiento)
+                // Si no hay fechas agregadas al viaje, debe mostrarse como "Pendiente"
+                const estadoTrace = traceCont.status_label || '';
+                const estadoLabel = !tieneFechasViaje
+                    ? 'Pendiente'
+                    : (estadoTrace || 'Pendiente');
+
+                const viajeFinalizado = tieneFechasViaje && (
                     normalizarTexto(traceCont.status) === 'FINALIZADO' ||
-                    normalizarTexto(estadoLabel) === 'FINALIZADO' ||
-                    (normalizarTexto(tramoActual.state) === 'FINALIZADO' && (!tienePlanta || tramos.length >= 2));
+                    normalizarTexto(traceCont.status_label) === 'FINALIZADO'
+                );
 
                 // Calcular las 3 estadías y su total
                 const estadiaOrigen = calcularEstadiaPunto(llegadaOrigen, salidaOrigen, { aplica: true, viajeFinalizado });
@@ -621,12 +638,13 @@ function generarTimeline(mov) {
         `;
     }).join('');
 
-    // Línea vertical continua ajustada al nuevo alto del encabezado
+    // Línea vertical continua que atraviesa todas las tarjetas
     document.getElementById('contenedorTimeline').innerHTML = `
         <div class="pointer-events-none absolute left-[29px] top-14 bottom-11 w-[2px] bg-slate-200 z-0"></div>
         ${tarjetasHtml}
     `;
 }
+
 // ============================================================================
 // 5. POSICIONAMIENTO GPS (THK TRACKING)
 // ============================================================================

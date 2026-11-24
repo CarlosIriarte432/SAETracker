@@ -91,7 +91,7 @@
             </div>
         </section>
 
-        <!-- RESULTADOS: TABLA -->
+        <!-- RESULTADOS: TABLA PRINCIPAL -->
         <section id="resultsSection" class="hidden animate-fade-in">
             <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
 
@@ -101,7 +101,7 @@
                             Reserva: <span id="displayBooking" class="text-sae-blue"></span>
                         </h3>
                         <p class="text-sm text-slate-500 mt-1">
-                            Seleccione un registro para visualizar su trazabilidad y ubicación.
+                            Seleccione un registro para visualizar su trazabilidad, estadías y ubicación.
                             <span id="ultimaActualizacion" class="ml-2 text-xs text-slate-400"></span>
                         </p>
                     </div>
@@ -131,7 +131,6 @@
                                 <th class="px-4 py-3 font-medium">Fecha retiro</th>
                                 <th class="px-4 py-3 font-medium">Origen</th>
                                 <th class="px-4 py-3 font-medium">Planta</th>
-                                <th class="px-4 py-3 font-medium">Estadía Planta</th>
                                 <th class="px-4 py-3 font-medium">Destino</th>
                                 <th class="px-4 py-3 font-medium">Conductor</th>
                                 <th class="px-4 py-3 font-medium">Patente</th>
@@ -160,11 +159,11 @@
             </div>
         </section>
 
-        <!-- SECCIÓN DE TRACKING (Timeline + Mapa) -->
+        <!-- SECCIÓN DE TRACKING (Timeline + Tabla de Estadías + Mapa condicional) -->
         <section id="trackingSection" class="hidden">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
-                <!-- Columna Timeline -->
+                <!-- Columna Izquierda: Timeline -->
                 <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 lg:col-span-1">
                     <div class="flex justify-between items-center mb-6">
                         <h3 class="font-bold text-slate-800">Trazabilidad</h3>
@@ -175,16 +174,47 @@
                     <div id="contenedorTimeline" class="timeline relative ml-4 py-2"></div>
                 </div>
 
-                <!-- Columna Mapa -->
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 lg:col-span-2 flex flex-col items-center justify-center min-h-[400px]" id="mapSectionParent">
-                    <div class="text-center w-full">
-                        <h3 class="font-bold text-slate-800 mb-2">Posicionamiento GPS</h3>
-                        <p class="text-sm text-slate-500 mb-6">Visualización en tiempo real de la unidad asignada.</p>
-                        <button onclick="mostrarMapa()" class="px-6 py-2.5 bg-slate-800 text-white rounded-lg text-sm font-medium hover:bg-slate-900 transition-colors shadow-sm">
-                            📍 Cargar Ubicación Actual
-                        </button>
+                <!-- Columna Derecha: Tabla de Estadías + GPS (solo si NO está finalizado) -->
+                <div class="lg:col-span-2 flex flex-col gap-6">
+
+                    <!-- Tarjeta Tabla de Estadías -->
+                    <div id="estadiasCard" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-4 mb-4">
+                            <div>
+                                <h3 class="font-bold text-slate-800">Resumen de Estadías</h3>
+                                <p class="text-xs text-slate-500 mt-0.5">Tiempos de permanencia registrados en cada punto del servicio.</p>
+                            </div>
+                            <span id="badgeEstadoViaje" class="px-3 py-1 rounded-full text-xs font-semibold"></span>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left">
+                                <thead class="text-xs text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                                    <tr>
+                                        <th class="px-4 py-3 font-medium">Estadía Origen</th>
+                                        <th class="px-4 py-3 font-medium">Estadía Planta</th>
+                                        <th class="px-4 py-3 font-medium">Estadía Destino</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tablaEstadiasBody" class="text-slate-700">
+                                    <!-- JS inyecta las 3 celdas aquí -->
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                    <div id="mapSection" class="w-full mt-6 hidden"></div>
+
+                    <!-- Tarjeta Posicionamiento GPS (Se oculta automáticamente si el viaje está Finalizado) -->
+                    <div id="mapSectionParent" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col items-center justify-center min-h-[300px]">
+                        <div class="text-center w-full">
+                            <h3 class="font-bold text-slate-800 mb-2">Posicionamiento GPS</h3>
+                            <p class="text-sm text-slate-500 mb-6">Visualización en tiempo real de la unidad asignada.</p>
+                            <button onclick="mostrarMapa()" class="px-6 py-2.5 bg-slate-800 text-white rounded-lg text-sm font-medium hover:bg-slate-900 transition-colors shadow-sm">
+                                📍 Cargar Ubicación Actual
+                            </button>
+                        </div>
+                        <div id="mapSection" class="w-full mt-6 hidden"></div>
+                    </div>
+
                 </div>
 
             </div>

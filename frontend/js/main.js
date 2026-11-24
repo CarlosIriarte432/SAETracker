@@ -22,7 +22,7 @@ let contenedorSeleccionado = null;
 // Lee fechas tanto si vienen como string (trazabilidad) o como objeto { at } (movimientos)
 const getAt = (val) => (val && typeof val === 'object') ? val.at : (val || null);
 
-// Normaliza textos para comparaciones seguras de lugares
+// Normaliza textos para comparaciones seguras
 const normalizarTexto = (txt) => (txt || '').trim().toUpperCase();
 
 // Formatea fecha y hora para los hitos del Timeline
@@ -36,29 +36,70 @@ function formatearFechaHora(str) {
     return `<span class="text-slate-800 font-medium">${fecha}</span> - ${hora}`;
 }
 
-// Calcula la estadía en planta desde la llegada hasta la salida (o en curso)
-function calcularEstadiaPlanta(llegadaStr, salidaStr, tienePlanta) {
-    if (!tienePlanta) return { texto: 'N/A', enCurso: false, esNA: true };
-    if (!llegadaStr) return { texto: 'Pendiente', enCurso: false, esNA: false };
+// Formatea hora corta (HH:MM) para mostrar el rango dentro de la tabla de estadías
+function formatearHoraCorta(str) {
+    if (!str) return '--:--';
+    const d = new Date(str);
+    if (isNaN(d.getTime())) return '--:--';
+    return d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+}
+
+// Calcula la estadía en cualquier punto (Origen, Planta o Destino)
+function calcularEstadiaPunto(llegadaStr, salidaStr, { aplica = true, viajeFinalizado = false } = {}) {
+    if (!aplica) {
+        return { texto: 'N/A', rango: '', enCurso: false, esNA: true, alerta: false };
+    }
+
+    if (!llegadaStr) {
+        return {
+            texto: viajeFinalizado ? 'Sin registro' : 'Pendiente',
+            rango: '',
+            enCurso: false,
+            esNA: false,
+            alerta: false
+        };
+    }
 
     const llegada = new Date(llegadaStr);
-    if (isNaN(llegada.getTime())) return { texto: 'Pendiente', enCurso: false, esNA: false };
+    if (isNaN(llegada.getTime())) {
+        return { texto: 'Sin registro', rango: '', enCurso: false, esNA: false, alerta: false };
+    }
 
+    const horaEntrada = formatearHoraCorta(llegadaStr);
     let fin;
     let enCurso = false;
 
     if (salidaStr) {
         fin = new Date(salidaStr);
-        if (isNaN(fin.getTime())) return { texto: 'Pendiente', enCurso: false, esNA: false };
-    } else {
-        // Si llegó a planta pero aún no registra salida, calcula el tiempo acumulado actual
+        if (isNaN(fin.getTime())) {
+            return { texto: 'Sin registro', rango: `Entrada: ${horaEntrada}`, enCurso: false, esNA: false, alerta: false };
+        }
+    } else if (!viajeFinalizado) {
+        // Si el viaje sigue activo y ya entró al punto, calcula el tiempo acumulado en vivo
         fin = new Date();
         enCurso = true;
+    } else {
+        return {
+            texto: 'Sin salida reg.',
+            rango: `Entrada: ${horaEntrada}`,
+            enCurso: false,
+            esNA: false,
+            alerta: false
+        };
     }
 
+    const horaSalida = enCurso ? 'Actual' : formatearHoraCorta(salidaStr);
+    const rango = `${horaEntrada} → ${horaSalida}`;
     const diffMin = Math.floor((fin - llegada) / 60000);
+
     if (diffMin < 0) {
-        return { texto: enCurso ? 'Pendiente' : 'Revisar fechas', enCurso: false, esNA: false };
+        return {
+            texto: enCurso ? 'Pendiente' : 'Revisar fechas',
+            rango,
+            enCurso: false,
+            esNA: false,
+            alerta: !enCurso
+        };
     }
 
     const horas = Math.floor(diffMin / 60);
@@ -67,8 +108,10 @@ function calcularEstadiaPlanta(llegadaStr, salidaStr, tienePlanta) {
 
     return {
         texto: enCurso ? `En curso (${formato})` : formato,
+        rango,
         enCurso,
-        esNA: false
+        esNA: false,
+        alerta: false
     };
 }
 
@@ -117,6 +160,8 @@ async function buscarReserva(referenciaForzada = null, esRecarga = false) {
 
             const cabecera = datos.cabecera || {};
             const infoContenedor = datos.contenedor || {};
+            trazabilidadGlobal = datos.trazabilidad || [];
+
             document.getElementById('displayBooking').innerText = cabecera.shipment || input.toUpperCase();
 
             // Mostrar hora de última actualización
@@ -154,6 +199,11 @@ async function buscarReserva(referenciaForzada = null, esRecarga = false) {
                 const tramoInicial = tramos[0];
                 const tramoActual = tramos[tramos.length - 1];
 
+                const traceCont = trazabilidadGlobal.find(t => t.container === tramoActual.container) || trazabilidadGlobal[0] || {};
+                const tm = traceCont.milestones || {};
+                const t1m = tramoInicial.milestones || {};
+                const t2m = tramoActual.milestones || {};
+
                 const esMismoCont = infoContenedor.container === tramoActual.container;
                 const pickupPlace = esMismoCont ? infoContenedor.pickup?.place : null;
                 const deliveryPlace = esMismoCont ? infoContenedor.delivery?.place : null;
@@ -162,7 +212,7 @@ async function buscarReserva(referenciaForzada = null, esRecarga = false) {
                 const origen = pickupPlace || tramoInicial.origin?.name || '-';
                 const destino = returnPlace || tramoActual.destination?.name || deliveryPlace || '-';
 
-                // Detectar si existe realmente una parada intermedia (planta)
+                // Detectar si existe parada intermedia (Planta)
                 let planta = null;
                 if (tramos.length >= 2) {
                     const candidata = deliveryPlace || tramoInicial.destination?.name;
@@ -173,16 +223,17 @@ async function buscarReserva(referenciaForzada = null, esRecarga = false) {
                     planta = deliveryPlace;
                 }
 
-                // Extraer hitos de planta evitando fechas inconsistentes del tramo 1
                 const tienePlanta = Boolean(planta) && tramos.length >= 2;
+
+                // Hitos de Origen
+                const llegadaOrigen = getAt(t1m.arrival_origin) || getAt(tm.arrival_origin);
+                const salidaOrigen = getAt(t1m.departure_origin) || getAt(tm.departure_origin);
+
+                // Hitos de Planta (si aplica)
                 let llegadaPlanta = null;
                 let salidaPlanta = null;
-
                 if (tienePlanta) {
-                    const t1m = tramos[0].milestones || {};
-                    const t2m = tramos[tramos.length - 1].milestones || {};
                     llegadaPlanta = getAt(t2m.arrival_origin) || getAt(t1m.arrival_destination);
-
                     const salT2 = getAt(t2m.departure_origin);
                     const salT1 = getAt(t1m.departure_destination);
                     if (salT2) {
@@ -192,19 +243,44 @@ async function buscarReserva(referenciaForzada = null, esRecarga = false) {
                     }
                 }
 
-                const estadia = calcularEstadiaPlanta(llegadaPlanta, salidaPlanta, tienePlanta);
+                // Hitos de Destino
+                const llegadaDestino = getAt(t2m.arrival_destination) || getAt(tm.arrival_destination);
+                const salidaDestino = getAt(t2m.departure_destination) || getAt(tm.departure_destination);
+
+                // Determinar si el viaje está finalizado
+                const estadoLabel = traceCont.status_label || tramoActual.state_label || 'Pendiente';
+                const viajeFinalizado =
+                    normalizarTexto(traceCont.status) === 'FINALIZADO' ||
+                    normalizarTexto(estadoLabel) === 'FINALIZADO' ||
+                    (normalizarTexto(tramoActual.state) === 'FINALIZADO' && (!tienePlanta || tramos.length >= 2));
+
+                // Calcular las 3 estadías
+                const estadiaOrigen = calcularEstadiaPunto(llegadaOrigen, salidaOrigen, { aplica: true, viajeFinalizado });
+                const estadiaPlanta = calcularEstadiaPunto(llegadaPlanta, salidaPlanta, { aplica: tienePlanta, viajeFinalizado });
+                const estadiaDestino = calcularEstadiaPunto(llegadaDestino, salidaDestino, { aplica: true, viajeFinalizado });
 
                 return {
                     ...tramoActual,
                     _clave: tramoActual.container || String(tramoActual.movement_id),
                     _tramos: tramos,
                     _ruta: { origen, planta, destino },
-                    _hitosPlanta: { llegada: llegadaPlanta, salida: salidaPlanta },
-                    _estadia: estadia
+                    _hitos: {
+                        llegadaOrigen,
+                        salidaOrigen,
+                        llegadaPlanta,
+                        salidaPlanta,
+                        llegadaDestino,
+                        salidaDestino
+                    },
+                    _estadias: {
+                        origen: estadiaOrigen,
+                        planta: estadiaPlanta,
+                        destino: estadiaDestino
+                    },
+                    _estadoLabel: estadoLabel,
+                    _finalizado: viajeFinalizado
                 };
             });
-
-            trazabilidadGlobal = datos.trazabilidad || [];
 
             let filaARestaurar = null;
 
@@ -219,15 +295,6 @@ async function buscarReserva(referenciaForzada = null, esRecarga = false) {
                     fechaRetiro = new Date(rawDate).toLocaleDateString('es-CL');
                 }
 
-                const traceTabla = trazabilidadGlobal.find(t => t.container === mov.container) || trazabilidadGlobal[0] || {};
-                const estadoLabel = traceTabla.status_label || mov.state_label || 'Pendiente';
-
-                const estadiaHtml = mov._estadia.esNA
-                    ? `<span class="text-slate-400">N/A</span>`
-                    : mov._estadia.enCurso
-                        ? `<span class="text-amber-600 font-semibold">${mov._estadia.texto}</span>`
-                        : `<span class="font-semibold text-slate-800">${mov._estadia.texto}</span>`;
-
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-slate-50 cursor-pointer transition-colors';
                 tr.onclick = function () {
@@ -240,13 +307,12 @@ async function buscarReserva(referenciaForzada = null, esRecarga = false) {
                     <td class="px-4 py-4">${fechaRetiro}</td>
                     <td class="px-4 py-4">${mov._ruta.origen}</td>
                     <td class="px-4 py-4">${mov._ruta.planta || '<span class="text-slate-400">N/A</span>'}</td>
-                    <td class="px-4 py-4">${estadiaHtml}</td>
                     <td class="px-4 py-4">${mov._ruta.destino}</td>
                     <td class="px-4 py-4">${mov.driver?.name || 'SIN ASIGNAR'}</td>
                     <td class="px-4 py-4 font-medium">${mov.truck || '-'}</td>
                     <td class="px-4 py-4 text-slate-500">${mov.ramp || '-'}</td>
                     <td class="px-4 py-4 text-slate-500">${mov.container || infoContenedor.container || '-'}</td>
-                    <td class="px-4 py-4 text-right text-sae-blue font-medium">${estadoLabel}</td>
+                    <td class="px-4 py-4 text-right font-medium ${mov._finalizado ? 'text-emerald-600' : 'text-sae-blue'}">${mov._estadoLabel}</td>
                 `;
                 tbody.appendChild(tr);
 
@@ -264,7 +330,8 @@ async function buscarReserva(referenciaForzada = null, esRecarga = false) {
                     filaARestaurar.tr,
                     true
                 );
-                if (mapaEstabaAbierto) {
+                // Solo recargar GPS si el viaje NO pasó a finalizado
+                if (mapaEstabaAbierto && !filaARestaurar.mov._finalizado) {
                     mostrarMapa();
                 }
             }
@@ -291,7 +358,7 @@ async function recargarDatos() {
 }
 
 // ============================================================================
-// 4. TRAZABILIDAD (TIMELINE)
+// 4. TRAZABILIDAD (TIMELINE), ESTADÍAS Y VISIBILIDAD GPS
 // ============================================================================
 
 function mostrarTracking(index, patenteCamion, patenteEquipo, elemento, silencioso = false) {
@@ -307,93 +374,106 @@ function mostrarTracking(index, patenteCamion, patenteEquipo, elemento, silencio
     document.getElementById('displayPlate').innerText = `Camión: ${patenteCamion} | Equipo: ${patenteEquipo}`;
 
     generarTimeline(mov);
+    renderizarTablaEstadias(mov);
 
-    document.getElementById('trackingSection').classList.remove('hidden');
-
-    // Resetear estado del mapa al cambiar de fila
+    // Regla de negocio: si el viaje está Finalizado, ocultar el GPS y mostrar solo estadías
+    const mapParent = document.getElementById('mapSectionParent');
     const mapSection = document.getElementById('mapSection');
+
     mapSection.classList.add('hidden');
     mapSection.innerHTML = '';
+
+    if (mov._finalizado) {
+        mapParent.classList.add('hidden');
+    } else {
+        mapParent.classList.remove('hidden');
+    }
+
+    document.getElementById('trackingSection').classList.remove('hidden');
 
     if (!silencioso) {
         document.getElementById('trackingSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 }
 
+function renderizarTablaEstadias(mov) {
+    const badge = document.getElementById('badgeEstadoViaje');
+    if (badge) {
+        if (mov._finalizado) {
+            badge.className = 'px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200';
+            badge.innerText = '✓ Servicio Finalizado';
+        } else {
+            badge.className = 'px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-sae-blue border border-blue-200';
+            badge.innerText = `● ${mov._estadoLabel}`;
+        }
+    }
+
+    const renderCelda = (estadia, nombreLugar) => {
+        let valorHtml = '';
+        if (estadia.esNA) {
+            valorHtml = `<span class="text-base font-semibold text-slate-400">N/A</span>`;
+        } else if (estadia.enCurso) {
+            valorHtml = `<span class="text-base font-bold text-amber-600">${estadia.texto}</span>`;
+        } else if (estadia.alerta) {
+            valorHtml = `<span class="text-sm font-semibold text-rose-600">${estadia.texto}</span>`;
+        } else if (estadia.texto === 'Sin registro' || estadia.texto === 'Pendiente' || estadia.texto === 'Sin salida reg.') {
+            valorHtml = `<span class="text-sm font-medium text-slate-400">${estadia.texto}</span>`;
+        } else {
+            valorHtml = `<span class="text-base font-bold text-slate-800">${estadia.texto}</span>`;
+        }
+
+        const lugarHtml = (!estadia.esNA && nombreLugar && nombreLugar !== '-')
+            ? `<p class="text-[11px] text-slate-400 mt-1 truncate max-w-[210px]" title="${nombreLugar}">${nombreLugar}</p>`
+            : '';
+
+        const rangoHtml = estadia.rango
+            ? `<p class="text-[11px] text-slate-500 mt-0.5">${estadia.rango}</p>`
+            : '';
+
+        return `
+            <td class="px-4 py-4 align-top">
+                ${valorHtml}
+                ${rangoHtml}
+                ${lugarHtml}
+            </td>
+        `;
+    };
+
+    document.getElementById('tablaEstadiasBody').innerHTML = `
+        <tr>
+            ${renderCelda(mov._estadias.origen, mov._ruta.origen)}
+            ${renderCelda(mov._estadias.planta, mov._ruta.planta)}
+            ${renderCelda(mov._estadias.destino, mov._ruta.destino)}
+        </tr>
+    `;
+}
+
 function generarTimeline(mov) {
-    const trace = trazabilidadGlobal.find(t => t.container === mov.container) || trazabilidadGlobal[0] || {};
     const tramos = mov._tramos || [mov];
     const tienePlanta = Boolean(mov._ruta?.planta) && tramos.length >= 2;
+    const h = mov._hitos || {};
 
     let pasos = [];
 
     if (tienePlanta) {
-        const t1 = tramos[0].milestones || {};
-        const t2 = tramos[tramos.length - 1].milestones || {};
-        const tm = trace.milestones || {};
-
         pasos = [
-            {
-                titulo: 'Llegada a Origen',
-                lugar: mov._ruta?.origen,
-                fecha: getAt(t1.arrival_origin) || getAt(tm.arrival_origin)
-            },
-            {
-                titulo: 'Salida de Origen',
-                lugar: '',
-                fecha: getAt(t1.departure_origin) || getAt(tm.departure_origin)
-            },
-            {
-                titulo: 'Llegada a Planta',
-                lugar: mov._ruta?.planta,
-                fecha: mov._hitosPlanta?.llegada || getAt(t2.arrival_origin) || getAt(t1.arrival_destination)
-            },
-            {
-                titulo: 'Salida de Planta',
-                lugar: '',
-                fecha: mov._hitosPlanta?.salida || getAt(t2.departure_origin),
-                mostrarEstadia: true
-            },
-            {
-                titulo: 'Llegada a Destino',
-                lugar: mov._ruta?.destino,
-                fecha: getAt(t2.arrival_destination) || getAt(tm.arrival_destination)
-            },
-            {
-                titulo: 'Salida de Destino',
-                lugar: '',
-                fecha: getAt(t2.departure_destination) || getAt(tm.departure_destination)
-            }
+            { titulo: 'Llegada a Origen', lugar: mov._ruta?.origen, fecha: h.llegadaOrigen },
+            { titulo: 'Salida de Origen', lugar: '', fecha: h.salidaOrigen },
+            { titulo: 'Llegada a Planta', lugar: mov._ruta?.planta, fecha: h.llegadaPlanta },
+            { titulo: 'Salida de Planta', lugar: '', fecha: h.salidaPlanta },
+            { titulo: 'Llegada a Destino', lugar: mov._ruta?.destino, fecha: h.llegadaDestino },
+            { titulo: 'Salida de Destino', lugar: '', fecha: h.salidaDestino }
         ];
     } else {
-        const tm = trace.milestones || {};
-        const m = mov.milestones || {};
-
         pasos = [
-            {
-                titulo: 'Llegada a Origen',
-                lugar: mov._ruta?.origen,
-                fecha: getAt(tm.arrival_origin) || getAt(m.arrival_origin)
-            },
-            {
-                titulo: 'Salida de Origen',
-                lugar: '',
-                fecha: getAt(tm.departure_origin) || getAt(m.departure_origin)
-            },
-            {
-                titulo: 'Llegada a Destino',
-                lugar: mov._ruta?.destino,
-                fecha: getAt(tm.arrival_destination) || getAt(m.arrival_destination)
-            },
-            {
-                titulo: 'Salida de Destino',
-                lugar: '',
-                fecha: getAt(tm.departure_destination) || getAt(m.departure_destination)
-            }
+            { titulo: 'Llegada a Origen', lugar: mov._ruta?.origen, fecha: h.llegadaOrigen },
+            { titulo: 'Salida de Origen', lugar: '', fecha: h.salidaOrigen },
+            { titulo: 'Llegada a Destino', lugar: mov._ruta?.destino, fecha: h.llegadaDestino },
+            { titulo: 'Salida de Destino', lugar: '', fecha: h.salidaDestino }
         ];
     }
 
-    const terminado = trace.status === 'finalizado' || Boolean(pasos[pasos.length - 1].fecha);
+    const terminado = mov._finalizado || Boolean(pasos[pasos.length - 1].fecha);
 
     document.getElementById('contenedorTimeline').innerHTML = pasos.map((paso, i) => {
         const esUltimo = i === pasos.length - 1;
@@ -403,20 +483,11 @@ function generarTimeline(mov) {
         const actual = !completado && Boolean(paso.fecha);
         const clase = completado ? 'completed' : (actual ? 'current' : '');
 
-        const badgeEstadia = (paso.mostrarEstadia && mov._estadia && !mov._estadia.esNA)
-            ? `<span class="inline-block mt-1.5 px-2.5 py-0.5 text-[11px] font-semibold rounded-full ${
-                mov._estadia.enCurso
-                    ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                    : 'bg-blue-50 text-sae-blue border border-blue-100'
-              }">⏱️ Estadía en planta: ${mov._estadia.texto}</span>`
-            : '';
-
         return `
             <div class="timeline-step relative pl-10 ${esUltimo ? 'mb-2' : 'mb-7'} ${clase}">
                 <p class="text-sm font-bold text-slate-700 m-0">${paso.titulo}</p>
                 ${paso.lugar && paso.lugar !== '-' ? `<p class="text-[11px] text-slate-400 mt-0.5 truncate" title="${paso.lugar}">${paso.lugar}</p>` : ''}
                 <p class="text-xs text-slate-500 mt-1">${formatearFechaHora(paso.fecha)}</p>
-                ${badgeEstadia}
             </div>
         `;
     }).join('');

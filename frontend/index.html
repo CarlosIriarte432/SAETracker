@@ -24,37 +24,6 @@
         }
     </script>
     <style>
-        /* CSS del Timeline adaptado a los colores limpios */
-        .timeline::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 20px;
-            height: 100%;
-            width: 2px;
-            background: #e2e8f0;
-        }
-        .timeline-step::before {
-            content: '';
-            position: absolute;
-            left: 14px;
-            top: 2px;
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
-            background: #e2e8f0;
-            border: 3px solid white;
-            box-shadow: 0 0 0 1px #cbd5e1;
-            z-index: 10;
-        }
-        .timeline-step.completed::before {
-            background: #2563eb;
-            box-shadow: 0 0 0 1px #2563eb;
-        }
-        .timeline-step.current::before {
-            background: #3b82f6;
-            box-shadow: 0 0 0 4px #bfdbfe;
-        }
         .table-row-active {
             background-color: #eff6ff !important;
             position: relative;
@@ -159,22 +128,22 @@
             </div>
         </section>
 
-        <!-- SECCIÓN DE TRACKING (Timeline + Tabla de Estadías + Mapa condicional) -->
+        <!-- SECCIÓN DE TRACKING (Hitos por sección + Tabla de Estadías + Mapa condicional) -->
         <section id="trackingSection" class="hidden">
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
-                <!-- Columna Izquierda: Timeline -->
+                <!-- Columna Izquierda: Hitos separados en Origen / Planta / Destino -->
                 <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 lg:col-span-1">
-                    <div class="flex justify-between items-center mb-6">
+                    <div class="flex justify-between items-center mb-4">
                         <h3 class="font-bold text-slate-800">Trazabilidad</h3>
                         <button onclick="volverPatentes()" class="text-xs text-slate-500 hover:text-sae-blue font-medium transition-colors">Cerrar ✕</button>
                     </div>
-                    <p class="text-sm font-medium text-sae-blue mb-6 bg-blue-50 p-2 rounded text-center" id="displayPlate"></p>
+                    <p class="text-sm font-medium text-sae-blue mb-5 bg-blue-50 p-2 rounded-lg text-center" id="displayPlate"></p>
 
-                    <div id="contenedorTimeline" class="timeline relative ml-4 py-2"></div>
+                    <div id="contenedorTimeline" class="space-y-4"></div>
                 </div>
 
-                <!-- Columna Derecha: Tabla de Estadías + GPS (solo si NO está finalizado) -->
+                <!-- Columna Derecha: Tabla de Estadías (con Total) + GPS (solo si NO está finalizado) -->
                 <div class="lg:col-span-2 flex flex-col gap-6">
 
                     <!-- Tarjeta Tabla de Estadías -->
@@ -194,10 +163,11 @@
                                         <th class="px-4 py-3 font-medium">Estadía Origen</th>
                                         <th class="px-4 py-3 font-medium">Estadía Planta</th>
                                         <th class="px-4 py-3 font-medium">Estadía Destino</th>
+                                        <th class="px-4 py-3 font-medium text-right">Total</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tablaEstadiasBody" class="text-slate-700">
-                                    <!-- JS inyecta las 3 celdas aquí -->
+                                    <!-- JS inyecta las celdas aquí -->
                                 </tbody>
                             </table>
                         </div>

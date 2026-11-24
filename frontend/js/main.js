@@ -25,18 +25,20 @@ const getAt = (val) => (val && typeof val === 'object') ? val.at : (val || null)
 // Normaliza textos para comparaciones seguras
 const normalizarTexto = (txt) => (txt || '').trim().toUpperCase();
 
-// Formatea fecha y hora para los hitos del Timeline
-function formatearFechaHora(str) {
-    if (!str) return 'Pendiente de registro';
+// Extrae fecha y hora separadas para las tarjetas de Trazabilidad
+function extraerFechaYHora(str) {
+    if (!str) return { fecha: 'Pendiente', hora: '--:--', tieneDato: false };
     const d = new Date(str);
-    if (isNaN(d.getTime())) return 'Pendiente de registro';
+    if (isNaN(d.getTime())) return { fecha: 'Pendiente', hora: '--:--', tieneDato: false };
 
-    const fecha = d.toLocaleDateString('es-CL');
-    const hora = d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
-    return `<span class="text-slate-800 font-medium">${fecha}</span> - ${hora}`;
+    return {
+        fecha: d.toLocaleDateString('es-CL'),
+        hora: d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }),
+        tieneDato: true
+    };
 }
 
-// Formatea hora corta (HH:MM) para mostrar el rango dentro de la tabla de estadías
+// Formatea hora corta (HH:MM) para el rango en la tabla de estadías
 function formatearHoraCorta(str) {
     if (!str) return '--:--';
     const d = new Date(str);
@@ -44,16 +46,24 @@ function formatearHoraCorta(str) {
     return d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
 }
 
+// Formatea minutos totales a "Xh YYm"
+function formatearDuracion(totalMinutos) {
+    const horas = Math.floor(totalMinutos / 60);
+    const minutos = totalMinutos % 60;
+    return `${horas}h ${String(minutos).padStart(2, '0')}m`;
+}
+
 // Calcula la estadía en cualquier punto (Origen, Planta o Destino)
 function calcularEstadiaPunto(llegadaStr, salidaStr, { aplica = true, viajeFinalizado = false } = {}) {
     if (!aplica) {
-        return { texto: 'N/A', rango: '', enCurso: false, esNA: true, alerta: false };
+        return { texto: 'N/A', rango: '', minutos: null, enCurso: false, esNA: true, alerta: false };
     }
 
     if (!llegadaStr) {
         return {
             texto: viajeFinalizado ? 'Sin registro' : 'Pendiente',
             rango: '',
+            minutos: null,
             enCurso: false,
             esNA: false,
             alerta: false
@@ -62,7 +72,7 @@ function calcularEstadiaPunto(llegadaStr, salidaStr, { aplica = true, viajeFinal
 
     const llegada = new Date(llegadaStr);
     if (isNaN(llegada.getTime())) {
-        return { texto: 'Sin registro', rango: '', enCurso: false, esNA: false, alerta: false };
+        return { texto: 'Sin registro', rango: '', minutos: null, enCurso: false, esNA: false, alerta: false };
     }
 
     const horaEntrada = formatearHoraCorta(llegadaStr);
@@ -72,16 +82,23 @@ function calcularEstadiaPunto(llegadaStr, salidaStr, { aplica = true, viajeFinal
     if (salidaStr) {
         fin = new Date(salidaStr);
         if (isNaN(fin.getTime())) {
-            return { texto: 'Sin registro', rango: `Entrada: ${horaEntrada}`, enCurso: false, esNA: false, alerta: false };
+            return {
+                texto: 'Sin registro',
+                rango: `Entrada: ${horaEntrada}`,
+                minutos: null,
+                enCurso: false,
+                esNA: false,
+                alerta: false
+            };
         }
     } else if (!viajeFinalizado) {
-        // Si el viaje sigue activo y ya entró al punto, calcula el tiempo acumulado en vivo
         fin = new Date();
         enCurso = true;
     } else {
         return {
             texto: 'Sin salida reg.',
             rango: `Entrada: ${horaEntrada}`,
+            minutos: null,
             enCurso: false,
             esNA: false,
             alerta: false
@@ -96,22 +113,58 @@ function calcularEstadiaPunto(llegadaStr, salidaStr, { aplica = true, viajeFinal
         return {
             texto: enCurso ? 'Pendiente' : 'Revisar fechas',
             rango,
+            minutos: null,
             enCurso: false,
             esNA: false,
             alerta: !enCurso
         };
     }
 
-    const horas = Math.floor(diffMin / 60);
-    const minutos = diffMin % 60;
-    const formato = `${horas}h ${String(minutos).padStart(2, '0')}m`;
+    const formato = formatearDuracion(diffMin);
 
     return {
         texto: enCurso ? `En curso (${formato})` : formato,
         rango,
+        minutos: diffMin,
         enCurso,
         esNA: false,
         alerta: false
+    };
+}
+
+// Calcula la suma total de estadías válidas (Origen + Planta + Destino)
+function calcularEstadiaTotal(estadias, viajeFinalizado) {
+    const puntos = [estadias.origen, estadias.planta, estadias.destino].filter(p => !p.esNA);
+
+    let totalMinutos = 0;
+    let puntosContabilizados = 0;
+    let algunoEnCurso = false;
+
+    puntos.forEach(p => {
+        if (typeof p.minutos === 'number' && p.minutos >= 0) {
+            totalMinutos += p.minutos;
+            puntosContabilizados += 1;
+            if (p.enCurso) algunoEnCurso = true;
+        }
+    });
+
+    if (puntosContabilizados === 0) {
+        return {
+            texto: viajeFinalizado ? 'Sin registro' : 'Pendiente',
+            subtexto: '',
+            enCurso: false,
+            sinDatos: true
+        };
+    }
+
+    const formato = formatearDuracion(totalMinutos);
+    const subtexto = `${puntosContabilizados} ${puntosContabilizados === 1 ? 'punto reg.' : 'puntos reg.'}`;
+
+    return {
+        texto: algunoEnCurso ? `En curso (${formato})` : formato,
+        subtexto,
+        enCurso: algunoEnCurso,
+        sinDatos: false
     };
 }
 
@@ -254,10 +307,14 @@ async function buscarReserva(referenciaForzada = null, esRecarga = false) {
                     normalizarTexto(estadoLabel) === 'FINALIZADO' ||
                     (normalizarTexto(tramoActual.state) === 'FINALIZADO' && (!tienePlanta || tramos.length >= 2));
 
-                // Calcular las 3 estadías
+                // Calcular las 3 estadías y su total
                 const estadiaOrigen = calcularEstadiaPunto(llegadaOrigen, salidaOrigen, { aplica: true, viajeFinalizado });
                 const estadiaPlanta = calcularEstadiaPunto(llegadaPlanta, salidaPlanta, { aplica: tienePlanta, viajeFinalizado });
                 const estadiaDestino = calcularEstadiaPunto(llegadaDestino, salidaDestino, { aplica: true, viajeFinalizado });
+                const estadiaTotal = calcularEstadiaTotal(
+                    { origen: estadiaOrigen, planta: estadiaPlanta, destino: estadiaDestino },
+                    viajeFinalizado
+                );
 
                 return {
                     ...tramoActual,
@@ -275,7 +332,8 @@ async function buscarReserva(referenciaForzada = null, esRecarga = false) {
                     _estadias: {
                         origen: estadiaOrigen,
                         planta: estadiaPlanta,
-                        destino: estadiaDestino
+                        destino: estadiaDestino,
+                        total: estadiaTotal
                     },
                     _estadoLabel: estadoLabel,
                     _finalizado: viajeFinalizado
@@ -330,7 +388,6 @@ async function buscarReserva(referenciaForzada = null, esRecarga = false) {
                     filaARestaurar.tr,
                     true
                 );
-                // Solo recargar GPS si el viaje NO pasó a finalizado
                 if (mapaEstabaAbierto && !filaARestaurar.mov._finalizado) {
                     mostrarMapa();
                 }
@@ -358,7 +415,7 @@ async function recargarDatos() {
 }
 
 // ============================================================================
-// 4. TRAZABILIDAD (TIMELINE), ESTADÍAS Y VISIBILIDAD GPS
+// 4. TRAZABILIDAD (3 MINI-SECCIONES), ESTADÍAS (CON TOTAL) Y GPS
 // ============================================================================
 
 function mostrarTracking(index, patenteCamion, patenteEquipo, elemento, silencioso = false) {
@@ -423,7 +480,7 @@ function renderizarTablaEstadias(mov) {
         }
 
         const lugarHtml = (!estadia.esNA && nombreLugar && nombreLugar !== '-')
-            ? `<p class="text-[11px] text-slate-400 mt-1 truncate max-w-[210px]" title="${nombreLugar}">${nombreLugar}</p>`
+            ? `<p class="text-[11px] text-slate-400 mt-1 truncate max-w-[180px]" title="${nombreLugar}">${nombreLugar}</p>`
             : '';
 
         const rangoHtml = estadia.rango
@@ -439,11 +496,26 @@ function renderizarTablaEstadias(mov) {
         `;
     };
 
+    const total = mov._estadias.total;
+    const totalValorHtml = total.sinDatos
+        ? `<span class="text-sm font-medium text-slate-400">${total.texto}</span>`
+        : total.enCurso
+            ? `<span class="text-base font-bold text-amber-600">${total.texto}</span>`
+            : `<span class="text-base font-bold text-sae-blue">${total.texto}</span>`;
+
+    const totalSubHtml = total.subtexto
+        ? `<p class="text-[11px] text-slate-500 mt-0.5">${total.subtexto}</p>`
+        : '';
+
     document.getElementById('tablaEstadiasBody').innerHTML = `
         <tr>
             ${renderCelda(mov._estadias.origen, mov._ruta.origen)}
             ${renderCelda(mov._estadias.planta, mov._ruta.planta)}
             ${renderCelda(mov._estadias.destino, mov._ruta.destino)}
+            <td class="px-4 py-4 align-top text-right bg-slate-50/70 border-l border-slate-100">
+                ${totalValorHtml}
+                ${totalSubHtml}
+            </td>
         </tr>
     `;
 }
@@ -453,41 +525,76 @@ function generarTimeline(mov) {
     const tienePlanta = Boolean(mov._ruta?.planta) && tramos.length >= 2;
     const h = mov._hitos || {};
 
-    let pasos = [];
+    // Construir 2 o 3 mini-secciones según si el viaje pasa por Planta
+    const secciones = [
+        {
+            titulo: 'Origen',
+            lugar: mov._ruta?.origen,
+            llegada: h.llegadaOrigen,
+            salida: h.salidaOrigen
+        }
+    ];
 
     if (tienePlanta) {
-        pasos = [
-            { titulo: 'Llegada a Origen', lugar: mov._ruta?.origen, fecha: h.llegadaOrigen },
-            { titulo: 'Salida de Origen', lugar: '', fecha: h.salidaOrigen },
-            { titulo: 'Llegada a Planta', lugar: mov._ruta?.planta, fecha: h.llegadaPlanta },
-            { titulo: 'Salida de Planta', lugar: '', fecha: h.salidaPlanta },
-            { titulo: 'Llegada a Destino', lugar: mov._ruta?.destino, fecha: h.llegadaDestino },
-            { titulo: 'Salida de Destino', lugar: '', fecha: h.salidaDestino }
-        ];
-    } else {
-        pasos = [
-            { titulo: 'Llegada a Origen', lugar: mov._ruta?.origen, fecha: h.llegadaOrigen },
-            { titulo: 'Salida de Origen', lugar: '', fecha: h.salidaOrigen },
-            { titulo: 'Llegada a Destino', lugar: mov._ruta?.destino, fecha: h.llegadaDestino },
-            { titulo: 'Salida de Destino', lugar: '', fecha: h.salidaDestino }
-        ];
+        secciones.push({
+            titulo: 'Planta',
+            lugar: mov._ruta?.planta,
+            llegada: h.llegadaPlanta,
+            salida: h.salidaPlanta
+        });
     }
 
-    const terminado = mov._finalizado || Boolean(pasos[pasos.length - 1].fecha);
+    secciones.push({
+        titulo: 'Destino',
+        lugar: mov._ruta?.destino,
+        llegada: h.llegadaDestino,
+        salida: h.salidaDestino
+    });
 
-    document.getElementById('contenedorTimeline').innerHTML = pasos.map((paso, i) => {
-        const esUltimo = i === pasos.length - 1;
-        const completado = esUltimo
-            ? terminado
-            : Boolean(paso.fecha) && (Boolean(pasos[i + 1].fecha) || terminado);
-        const actual = !completado && Boolean(paso.fecha);
-        const clase = completado ? 'completed' : (actual ? 'current' : '');
+    const renderSubBloque = (etiqueta, fechaStr) => {
+        const info = extraerFechaYHora(fechaStr);
+        const dotClass = info.tieneDato ? 'bg-sae-blue' : 'bg-slate-300';
+        const fechaClass = info.tieneDato ? 'text-slate-800 font-semibold' : 'text-slate-400 font-medium';
+        const horaClass = info.tieneDato ? 'text-sae-blue font-semibold' : 'text-slate-400';
 
         return `
-            <div class="timeline-step relative pl-10 ${esUltimo ? 'mb-2' : 'mb-7'} ${clase}">
-                <p class="text-sm font-bold text-slate-700 m-0">${paso.titulo}</p>
-                ${paso.lugar && paso.lugar !== '-' ? `<p class="text-[11px] text-slate-400 mt-0.5 truncate" title="${paso.lugar}">${paso.lugar}</p>` : ''}
-                <p class="text-xs text-slate-500 mt-1">${formatearFechaHora(paso.fecha)}</p>
+            <div class="bg-white rounded-lg border border-slate-200/80 p-2.5 text-center">
+                <div class="flex items-center justify-center gap-1.5 mb-1">
+                    <span class="w-1.5 h-1.5 rounded-full ${dotClass}"></span>
+                    <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">${etiqueta}</span>
+                </div>
+                <p class="text-xs ${fechaClass}">${info.fecha}</p>
+                <p class="text-xs ${horaClass} mt-0.5">${info.tieneDato ? `${info.hora} hrs` : info.hora}</p>
+            </div>
+        `;
+    };
+
+    document.getElementById('contenedorTimeline').innerHTML = secciones.map(sec => {
+        const tieneLlegada = Boolean(sec.llegada);
+        const tieneSalida = Boolean(sec.salida);
+        const completado = tieneLlegada && tieneSalida;
+        const enProceso = tieneLlegada && !tieneSalida;
+
+        const cardBorder = completado
+            ? 'border-blue-200 bg-blue-50/30'
+            : enProceso
+                ? 'border-amber-200 bg-amber-50/30'
+                : 'border-slate-200 bg-slate-50/70';
+
+        const lugarHtml = (sec.lugar && sec.lugar !== '-')
+            ? `<p class="text-[11px] text-slate-500 text-center truncate mt-0.5 px-2" title="${sec.lugar}">${sec.lugar}</p>`
+            : '';
+
+        return `
+            <div class="rounded-xl border ${cardBorder} p-3.5">
+                <div class="mb-3">
+                    <h4 class="text-sm font-bold text-slate-800 text-center uppercase tracking-wide">${sec.titulo}</h4>
+                    ${lugarHtml}
+                </div>
+                <div class="grid grid-cols-2 gap-2.5">
+                    ${renderSubBloque('Llegada', sec.llegada)}
+                    ${renderSubBloque('Salida', sec.salida)}
+                </div>
             </div>
         `;
     }).join('');

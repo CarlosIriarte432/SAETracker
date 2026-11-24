@@ -15,16 +15,16 @@
                         sans: ['Inter', 'sans-serif'],
                     },
                     colors: {
-                        'sae-dark': '#0f172a', /* Slate 900 */
-                        'sae-blue': '#2563eb', /* Blue 600 - Como el botón de SAEDocs */
-                        'sae-bg': '#f8fafc', /* Slate 50 */
+                        'sae-dark': '#0f172a',
+                        'sae-blue': '#2563eb',
+                        'sae-bg': '#f8fafc',
                     }
                 }
             }
         }
     </script>
     <style>
-        /* CSS del Timeline adaptado a los nuevos colores limpios */
+        /* CSS del Timeline adaptado a los colores limpios */
         .timeline::before {
             content: '';
             position: absolute;
@@ -32,7 +32,7 @@
             left: 20px;
             height: 100%;
             width: 2px;
-            background: #e2e8f0; /* slate-200 */
+            background: #e2e8f0;
         }
         .timeline-step::before {
             content: '';
@@ -47,21 +47,20 @@
             box-shadow: 0 0 0 1px #cbd5e1;
             z-index: 10;
         }
-        .timeline-step.completed::before { 
-            background: #2563eb; 
+        .timeline-step.completed::before {
+            background: #2563eb;
             box-shadow: 0 0 0 1px #2563eb;
         }
         .timeline-step.current::before {
             background: #3b82f6;
             box-shadow: 0 0 0 4px #bfdbfe;
         }
-        /* Fila activa elegante (sin fondo oscuro pesado) */
-        .table-row-active { 
-            background-color: #eff6ff !important; /* blue-50 */
+        .table-row-active {
+            background-color: #eff6ff !important;
             position: relative;
         }
         .table-row-active td:first-child {
-            box-shadow: inset 4px 0 0 0 #2563eb; /* Borde azul a la izquierda */
+            box-shadow: inset 4px 0 0 0 #2563eb;
         }
     </style>
 </head>
@@ -76,17 +75,16 @@
     </header>
 
     <main class="max-w-7xl mx-auto my-8 px-6">
-        
-        <!-- SECCIÓN DE BÚSQUEDA (Look idéntico a SAEDocs) -->
+
+        <!-- SECCIÓN DE BÚSQUEDA -->
         <section id="searchSection" class="text-center py-20">
             <img src="./src/SAETracker_GPS_Logo.png" alt="SAETracker" class="h-28 mx-auto mb-6">
             <p class="mb-10 text-slate-500 font-medium">Portal consolidado de seguimiento y posicionamiento</p>
-            
-            <!-- Input Pill Style -->
+
             <div class="max-w-3xl mx-auto flex items-center p-1.5 bg-white border border-slate-300 rounded-xl shadow-sm focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all">
-                <input type="text" id="bookingInput" placeholder="N° de Reserva o Booking (Ej: 070ISA1230321)" 
+                <input type="text" id="bookingInput" placeholder="N° de Reserva o Booking (Ej: 070ISA1230321)"
                        class="w-full px-4 py-3 text-slate-700 outline-none rounded-l-xl bg-transparent">
-                <button onclick="buscarReserva()" id="btnSearch" 
+                <button onclick="buscarReserva()" id="btnSearch"
                         class="px-8 py-3 bg-sae-blue text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm">
                     Buscar
                 </button>
@@ -96,18 +94,34 @@
         <!-- RESULTADOS: TABLA -->
         <section id="resultsSection" class="hidden animate-fade-in">
             <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
-                
-                <div class="flex justify-between items-start border-b border-slate-100 pb-4 mb-4">
+
+                <div class="flex flex-wrap justify-between items-start gap-4 border-b border-slate-100 pb-4 mb-4">
                     <div>
-                        <h3 class="text-lg font-bold text-slate-800">Reserva: <span id="displayBooking" class="text-sae-blue"></span></h3>
-                        <p class="text-sm text-slate-500 mt-1">Seleccione un registro para visualizar su trazabilidad y ubicación.</p>
+                        <h3 class="text-lg font-bold text-slate-800">
+                            Reserva: <span id="displayBooking" class="text-sae-blue"></span>
+                        </h3>
+                        <p class="text-sm text-slate-500 mt-1">
+                            Seleccione un registro para visualizar su trazabilidad y ubicación.
+                            <span id="ultimaActualizacion" class="ml-2 text-xs text-slate-400"></span>
+                        </p>
                     </div>
-                    <button onclick="volverInicio()" class="text-sm text-slate-500 hover:text-sae-blue font-medium transition-colors flex items-center gap-1">
-                        ← Nueva Búsqueda
-                    </button>
+
+                    <div class="flex items-center gap-3">
+                        <button id="btnRecargar" onclick="recargarDatos()"
+                                class="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300 rounded-lg text-xs font-medium transition-colors shadow-sm">
+                            <svg id="iconoRecargar" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                            </svg>
+                            <span>Recargar datos</span>
+                        </button>
+
+                        <button onclick="volverInicio()" class="text-sm text-slate-500 hover:text-sae-blue font-medium transition-colors flex items-center gap-1">
+                            ← Nueva Búsqueda
+                        </button>
+                    </div>
                 </div>
 
-                <!-- Le agregamos id="tablaResultados" a la tabla -->
                 <div class="overflow-x-auto">
                     <table id="tablaResultados" class="w-full text-sm text-left whitespace-nowrap">
                         <thead class="text-xs text-slate-500 uppercase tracking-wider border-b border-slate-200">
@@ -117,6 +131,7 @@
                                 <th class="px-4 py-3 font-medium">Fecha retiro</th>
                                 <th class="px-4 py-3 font-medium">Origen</th>
                                 <th class="px-4 py-3 font-medium">Planta</th>
+                                <th class="px-4 py-3 font-medium">Estadía Planta</th>
                                 <th class="px-4 py-3 font-medium">Destino</th>
                                 <th class="px-4 py-3 font-medium">Conductor</th>
                                 <th class="px-4 py-3 font-medium">Patente</th>
@@ -131,13 +146,12 @@
                     </table>
                 </div>
 
-                <!-- NUEVO: Botón de Copiar Datos -->
                 <div class="mt-4 flex justify-end">
-                    <button id="btnCopiar" onclick="copiarTablaParaCorreo()" 
+                    <button id="btnCopiar" onclick="copiarTablaParaCorreo()"
                             class="flex items-center gap-2 px-5 py-2.5 bg-slate-100 text-slate-700 font-medium rounded-lg hover:bg-slate-200 transition-colors border border-slate-300 text-sm shadow-sm">
-                        <!-- Icono de portapapeles -->
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path>
                         </svg>
                         <span>Copiar al portapapeles</span>
                     </button>
@@ -149,7 +163,7 @@
         <!-- SECCIÓN DE TRACKING (Timeline + Mapa) -->
         <section id="trackingSection" class="hidden">
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                
+
                 <!-- Columna Timeline -->
                 <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 lg:col-span-1">
                     <div class="flex justify-between items-center mb-6">
@@ -157,7 +171,7 @@
                         <button onclick="volverPatentes()" class="text-xs text-slate-500 hover:text-sae-blue font-medium transition-colors">Cerrar ✕</button>
                     </div>
                     <p class="text-sm font-medium text-sae-blue mb-6 bg-blue-50 p-2 rounded text-center" id="displayPlate"></p>
-                    
+
                     <div id="contenedorTimeline" class="timeline relative ml-4 py-2"></div>
                 </div>
 
@@ -177,315 +191,12 @@
         </section>
     </main>
 
-    <!-- Píldora Watermark Zero Ping (Idéntica a SAEDocs) -->
+    <!-- Píldora Watermark Zero Ping -->
     <div class="fixed bottom-6 right-6 bg-white px-5 py-2.5 rounded-full shadow-md text-xs text-slate-500 border border-slate-200 z-50">
         Desarrollado por <span class="font-bold text-slate-800">ZERO PING SPA</span>
     </div>
 
-    <script>
-        let equipoSeleccionado = '';
-        let movimientosGlobales = [];
-        let trazabilidadGlobal = [];
-
-        async function buscarReserva() {
-            const input = document.getElementById('bookingInput').value.trim();
-            if (input === '') return alert('Por favor ingrese un número de reserva o servicio.');
-
-            const btn = document.getElementById('btnSearch');
-            btn.innerHTML = `
-                <svg class="animate-spin h-5 w-5 mx-auto text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>`;
-            btn.disabled = true;
-
-            try {
-                // Manteniendo tu URL de Render para producción
-                const respuesta = await fetch(`https://saetracker.onrender.com/api/gotruck?referencia=${encodeURIComponent(input)}`);
-                const datos = await respuesta.json();
-
-                if (respuesta.ok && datos.existe) {
-                    document.getElementById('searchSection').classList.add('hidden');
-                    document.getElementById('resultsSection').classList.remove('hidden');
-                    document.getElementById('trackingSection').classList.add('hidden');
-
-                    const cabecera = datos.cabecera || {};
-                    const infoContenedor = datos.contenedor || {};
-                    
-                    document.getElementById('displayBooking').innerText = cabecera.shipment || input.toUpperCase();
-
-                    const tbody = document.getElementById('tablaPatentes');
-                    tbody.innerHTML = '';
-                    
-                    const movimientosPorContenedor = {};
-                    (datos.movimientos || []).forEach(mov => {
-                        const claveContenedor = (mov.container && mov.container !== 'N/D') ? mov.container.trim() : `SIN_CONT_${mov.movement_id}`;
-                        if (!movimientosPorContenedor[claveContenedor] || mov.movement_id > movimientosPorContenedor[claveContenedor].movement_id) {
-                            movimientosPorContenedor[claveContenedor] = mov;
-                        }
-                    });
-
-                    movimientosGlobales = Object.values(movimientosPorContenedor);
-                    trazabilidadGlobal = datos.trazabilidad || [];
-
-                    // Agrupar movimientos por contenedor y por etapa (status_id) para conservar
-                // Tramo 1 (Planta) y Tramo 2 (Puerto) sin perder el filtro anti-enroques
-                const contenedoresMap = {};
-                (datos.movimientos || []).forEach(mov => {
-                    const claveCont = (mov.container && mov.container !== 'N/D')
-                        ? mov.container.trim()
-                        : `SIN_CONT_${mov.movement_id}`;
-
-                    if (!contenedoresMap[claveCont]) {
-                        contenedoresMap[claveCont] = {};
-                    }
-
-                    const claveEtapa = mov.status_id || mov.status_label || mov.movement_id;
-                    // Si hubo enroque en la misma etapa, nos quedamos con el movement_id más reciente
-                    if (!contenedoresMap[claveCont][claveEtapa] || mov.movement_id > contenedoresMap[claveCont][claveEtapa].movement_id) {
-                        contenedoresMap[claveCont][claveEtapa] = mov;
-                    }
-                });
-
-                // Construir 1 registro por contenedor con sus tramos ordenados cronológicamente
-                const norm = (txt) => (txt || '').trim().toUpperCase();
-
-                movimientosGlobales = Object.values(contenedoresMap).map(etapasObj => {
-                    const tramos = Object.values(etapasObj).sort((a, b) => a.movement_id - b.movement_id);
-                    const tramoInicial = tramos[0];
-                    const tramoActual = tramos[tramos.length - 1];
-
-                    const esMismoCont = infoContenedor.container === tramoActual.container;
-                    const pickupPlace = esMismoCont ? infoContenedor.pickup?.place : null;
-                    const deliveryPlace = esMismoCont ? infoContenedor.delivery?.place : null;
-                    const returnPlace = esMismoCont ? infoContenedor.return?.place : null;
-
-                    const origen = pickupPlace || tramoInicial.origin?.name || '-';
-                    const destino = returnPlace || tramoActual.destination?.name || deliveryPlace || '-';
-
-                    // Solo existe parada intermedia si hay 2+ tramos, o si delivery existe y es distinto a origen y destino
-                    let planta = null;
-                    if (tramos.length >= 2) {
-                        const candidata = deliveryPlace || tramoInicial.destination?.name;
-                        if (candidata && norm(candidata) !== norm(origen) && norm(candidata) !== norm(destino)) {
-                            planta = candidata;
-                        }
-                    } else if (deliveryPlace && returnPlace && norm(deliveryPlace) !== norm(origen) && norm(deliveryPlace) !== norm(destino)) {
-                        planta = deliveryPlace;
-                    }
-
-                    return {
-                        ...tramoActual,
-                        _tramos: tramos,
-                        _ruta: { origen, planta, destino }
-                    };
-                });
-
-                trazabilidadGlobal = datos.trazabilidad || [];
-
-                movimientosGlobales.forEach((mov, index) => {
-                    let fechaRetiro = '-';
-                    const rawDate = infoContenedor.pickup?.scheduled_at || infoContenedor.pickup_at || mov._tramos[0]?.start_at || cabecera.containers?.[0]?.pickup_at;
-                    if (rawDate) fechaRetiro = new Date(rawDate).toLocaleDateString('es-CL');
-
-                    const traceTabla = trazabilidadGlobal.find(t => t.container === mov.container) || trazabilidadGlobal[0] || {};
-                    const estadoLabel = traceTabla.status_label || mov.state_label || 'Pendiente';
-
-                    const tr = document.createElement('tr');
-                    tr.className = "hover:bg-slate-50 cursor-pointer transition-colors";
-                    tr.onclick = function() { mostrarTracking(index, mov.truck || 'N/D', mov.ramp || 'N/D', this); };
-
-                    tr.innerHTML = `
-                        <td class="px-4 py-4 text-slate-400 font-medium">${index + 1}</td>
-                        <td class="px-4 py-4 font-medium text-slate-800">${mov.service_id || cabecera.service_id || '-'}</td>
-                        <td class="px-4 py-4">${fechaRetiro}</td>
-                        <td class="px-4 py-4">${mov._ruta.origen}</td>
-                        <td class="px-4 py-4">${mov._ruta.planta || '<span class="text-slate-400">N/A</span>'}</td>
-                        <td class="px-4 py-4">${mov._ruta.destino}</td>
-                        <td class="px-4 py-4">${mov.driver?.name || 'SIN ASIGNAR'}</td>
-                        <td class="px-4 py-4 font-medium">${mov.truck || '-'}</td>
-                        <td class="px-4 py-4 text-slate-500">${mov.ramp || '-'}</td>
-                        <td class="px-4 py-4 text-slate-500">${mov.container || infoContenedor.container || '-'}</td>
-                        <td class="px-4 py-4 text-right text-sae-blue font-medium">${estadoLabel}</td>
-                    `;
-                    tbody.appendChild(tr);
-                });
-                } else {
-                    alert(datos.error ? `Error: ${datos.error}` : 'No se encontraron registros activos para esta reserva.');
-                }
-            } catch (error) {
-                console.error(error);
-                alert('Fallo de conexión.');
-            } finally {
-                btn.innerText = 'Buscar';
-                btn.disabled = false;
-            }
-        }
-
-        function mostrarTracking(index, patenteCamion, patenteEquipo, elemento) {
-            document.querySelectorAll('#tablaPatentes tr').forEach(f => f.classList.remove('table-row-active'));
-            elemento.classList.add('table-row-active');
-
-            equipoSeleccionado = patenteEquipo;
-            const mov = movimientosGlobales[index];
-            document.getElementById('displayPlate').innerText = `Camión: ${patenteCamion} | Equipo: ${patenteEquipo}`;
-
-            generarTimeline(mov);
-
-            document.getElementById('trackingSection').classList.remove('hidden');
-            // Resetear estado del mapa al cambiar de fila
-            document.getElementById('mapSection').classList.add('hidden');
-            document.getElementById('mapSection').innerHTML = '';
-            
-            document.getElementById('trackingSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-
-        function generarTimeline(mov) {
-    const trace = trazabilidadGlobal.find(t => t.container === mov.container) || trazabilidadGlobal[0] || {};
-    const tramos = mov._tramos || [mov];
-    const tienePlanta = Boolean(mov._ruta?.planta) && tramos.length >= 2;
-    // Helper: lee tanto strings (trazabilidad) como objetos { at } (movimientos)
-    const getAt = (val) => (val && typeof val === 'object') ? val.at : (val || null);
-
-    const formatFecha = (str) => str
-        ? `<span class="text-slate-800 font-medium">${new Date(str).toLocaleDateString('es-CL')}</span> - ${new Date(str).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}`
-        : 'Pendiente de registro';
-
-    let pasos = [];
-
-    if (tienePlanta) {
-        const t1 = tramos[0].milestones || {};
-        const t2 = tramos[tramos.length - 1].milestones || {};
-        const tm = trace.milestones || {};
-
-        pasos = [
-            { titulo: 'Llegada a Origen', lugar: mov._ruta?.origen, fecha: getAt(t1.arrival_origin) || getAt(tm.arrival_origin) },
-            { titulo: 'Salida de Origen', lugar: '', fecha: getAt(t1.departure_origin) || getAt(tm.departure_origin) },
-            { titulo: 'Llegada a Planta', lugar: mov._ruta?.planta, fecha: getAt(t2.arrival_origin) || getAt(t1.arrival_destination) },
-            { titulo: 'Salida de Planta', lugar: '', fecha: getAt(t2.departure_origin) || getAt(t1.departure_destination) },
-            { titulo: 'Llegada a Destino', lugar: mov._ruta?.destino, fecha: getAt(t2.arrival_destination) || getAt(tm.arrival_destination) },
-            { titulo: 'Salida de Destino', lugar: '', fecha: getAt(t2.departure_destination) || getAt(tm.departure_destination) }
-        ];
-    } else {
-        const tm = trace.milestones || {};
-        const m = mov.milestones || {};
-
-        pasos = [
-            { titulo: 'Llegada a Origen', lugar: mov._ruta?.origen, fecha: getAt(tm.arrival_origin) || getAt(m.arrival_origin) },
-            { titulo: 'Salida de Origen', lugar: '', fecha: getAt(tm.departure_origin) || getAt(m.departure_origin) },
-            { titulo: 'Llegada a Destino', lugar: mov._ruta?.destino, fecha: getAt(tm.arrival_destination) || getAt(m.arrival_destination) },
-            { titulo: 'Salida de Destino', lugar: '', fecha: getAt(tm.departure_destination) || getAt(m.departure_destination) }
-        ];
-    }
-
-    const terminado = trace.status === 'finalizado' || Boolean(pasos[pasos.length - 1].fecha);
-
-    document.getElementById('contenedorTimeline').innerHTML = pasos.map((paso, i) => {
-        const esUltimo = i === pasos.length - 1;
-        const completado = esUltimo
-            ? terminado
-            : Boolean(paso.fecha) && (Boolean(pasos[i + 1].fecha) || terminado);
-        const actual = !completado && Boolean(paso.fecha);
-        const clase = completado ? 'completed' : (actual ? 'current' : '');
-
-        return `
-            <div class="timeline-step relative pl-10 ${esUltimo ? 'mb-2' : 'mb-7'} ${clase}">
-                <p class="text-sm font-bold text-slate-700 m-0">${paso.titulo}</p>
-                ${paso.lugar && paso.lugar !== '-' ? `<p class="text-[11px] text-slate-400 mt-0.5 truncate" title="${paso.lugar}">${paso.lugar}</p>` : ''}
-                <p class="text-xs text-slate-500 mt-1">${formatFecha(paso.fecha)}</p>
-            </div>
-        `;
-    }).join('');
-}
-
-        async function mostrarMapa() {
-            const mapSec = document.getElementById('mapSection');
-            mapSec.classList.remove('hidden');
-
-            if (!equipoSeleccionado || equipoSeleccionado === 'N/D' || equipoSeleccionado === '-') {
-                return mapSec.innerHTML = `<div class="w-full py-12 text-center bg-slate-50 rounded-xl text-slate-500 text-sm font-medium">No hay Patente de Equipos asignada para consultar GPS.</div>`;
-            }
-
-            mapSec.innerHTML = `<div class="w-full py-12 text-center bg-slate-50 rounded-xl text-sae-blue text-sm font-medium animate-pulse">Obteniendo coordenadas satelitales para ${equipoSeleccionado}...</div>`;
-
-            try {
-                const res = await fetch(`https://saetracker.onrender.com/api/thk?name=${encodeURIComponent(equipoSeleccionado)}`);
-                const data = await res.json();
-
-                if (res.ok && data.lat && data.lng) {
-                    const f = data.fecha ? new Date(data.fecha) : null;
-                    const fechaTxt = (f && !isNaN(f)) ? `${f.toLocaleDateString('es-CL')} - ${f.toLocaleTimeString('es-CL', {hour:'2-digit', minute:'2-digit'})}` : 'Reciente';
-
-                    mapSec.innerHTML = `
-                        <div class="rounded-xl overflow-hidden border border-slate-200 mt-4">
-                            <div class="bg-slate-50 border-b border-slate-200 p-3 flex justify-between items-center text-xs">
-                                <span class="font-bold text-slate-700">📍 ${data.name}</span>
-                                <span class="text-slate-500">Última lectura: ${fechaTxt}</span>
-                            </div>
-                            <iframe width="100%" height="350" frameborder="0" src="https://maps.google.com/maps?q=${data.lat},${data.lng}&hl=es&z=15&output=embed"></iframe>
-                        </div>
-                    `;
-                } else {
-                    mapSec.innerHTML = `<div class="w-full py-12 text-center bg-red-50 rounded-xl text-red-500 text-sm font-medium">No se encontró señal GPS activa para el equipo ${equipoSeleccionado}.</div>`;
-                }
-            } catch (e) {
-                mapSec.innerHTML = `<div class="w-full py-12 text-center bg-red-50 rounded-xl text-red-500 text-sm font-medium">Error de conexión con el proveedor GPS.</div>`;
-            }
-        }
-
-        function volverInicio() {
-            document.getElementById('resultsSection').classList.add('hidden');
-            document.getElementById('trackingSection').classList.add('hidden');
-            document.getElementById('searchSection').classList.remove('hidden');
-            document.getElementById('bookingInput').value = '';
-        }
-
-        function volverPatentes() {
-            document.getElementById('trackingSection').classList.add('hidden');
-            document.querySelectorAll('#tablaPatentes tr').forEach(f => f.classList.remove('table-row-active'));
-        }
-
-        function copiarTablaParaCorreo() {
-            const tabla = document.getElementById('tablaResultados');
-            const btnCopiar = document.getElementById('btnCopiar');
-            const originalHTML = btnCopiar.innerHTML;
-
-            // 1. Creamos un "Rango" y seleccionamos la tabla
-            const range = document.createRange();
-            range.selectNode(tabla);
-            
-            // 2. Aplicamos la selección al navegador
-            const windowSelection = window.getSelection();
-            windowSelection.removeAllRanges(); // Limpiamos selecciones previas
-            windowSelection.addRange(range);
-            
-            try {
-                // 3. Ejecutamos el comando de copiado nativo
-                document.execCommand('copy');
-                
-                // 4. Feedback visual de éxito
-                btnCopiar.classList.remove('bg-slate-100', 'text-slate-700', 'border-slate-300');
-                btnCopiar.classList.add('bg-green-500', 'text-white', 'border-green-600');
-                btnCopiar.innerHTML = `
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                    <span>¡Copiado al portapapeles!</span>
-                `;
-                
-                // 5. Devolver el botón a la normalidad después de 2 segundos
-                setTimeout(() => {
-                    btnCopiar.classList.remove('bg-green-500', 'text-white', 'border-green-600');
-                    btnCopiar.classList.add('bg-slate-100', 'text-slate-700', 'border-slate-300');
-                    btnCopiar.innerHTML = originalHTML;
-                }, 2000);
-
-            } catch (err) {
-                console.error('Error al copiar: ', err);
-                alert('Hubo un problema al copiar la tabla.');
-            }
-            
-            // 6. Quitamos el sombreado de la tabla para que no quede seleccionada visualmente
-            windowSelection.removeAllRanges();
-        }
-    </script>
+    <!-- Lógica Principal -->
+    <script src="./js/main.js"></script>
 </body>
 </html>

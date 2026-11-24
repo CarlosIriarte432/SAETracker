@@ -583,14 +583,17 @@ function generarTimeline(mov) {
 
         return `
             <div class="relative rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
-                <!-- Bloque Llegada (con el título de la sección encima) -->
+                <!-- Título de la sección centrado, más grande y en azul marino -->
+                <h4 class="text-base font-extrabold text-center text-[#06152d] tracking-wide leading-tight mb-2.5">
+                    ${sec.titulo}
+                </h4>
+
+                <!-- Bloque Llegada -->
                 <div class="flex items-start">
-                    <div class="w-7 flex flex-col items-center shrink-0">
-                        <span class="h-[22px]"></span>
+                    <div class="w-7 flex flex-col items-center shrink-0 pt-0.5">
                         ${renderNodo(tieneLlegada, llegadaEnCurso)}
                     </div>
                     <div class="flex-1 min-w-0 pl-2.5">
-                        <h4 class="text-sm font-bold text-slate-900 leading-tight mb-0.5">${sec.titulo}</h4>
                         <p class="text-sm font-medium text-slate-800 leading-snug">Llegada</p>
                         ${lugarHtml}
                         <p class="text-xs ${tieneLlegada ? 'text-slate-700 font-medium' : 'text-slate-400'} mt-1">
@@ -618,13 +621,12 @@ function generarTimeline(mov) {
         `;
     }).join('');
 
-    // Línea vertical continua que atraviesa todas las tarjetas y su separación (space-y-4)
+    // Línea vertical continua ajustada al nuevo alto del encabezado
     document.getElementById('contenedorTimeline').innerHTML = `
-        <div class="pointer-events-none absolute left-[29px] top-11 bottom-11 w-[2px] bg-slate-200 z-0"></div>
+        <div class="pointer-events-none absolute left-[29px] top-14 bottom-11 w-[2px] bg-slate-200 z-0"></div>
         ${tarjetasHtml}
     `;
 }
-
 // ============================================================================
 // 5. POSICIONAMIENTO GPS (THK TRACKING)
 // ============================================================================
